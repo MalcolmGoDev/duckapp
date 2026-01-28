@@ -15,7 +15,7 @@ Just open `index.html` in a browser, or deploy to Vercel/Netlify.
 
 ## Built during
 
-Live demo at a webinar, January 2026.
+[Claude Code 101: Kickstart 2026](https://maven.com/p/e93f82/claude-code-101-kickstart-2026)
 
 ---
 
