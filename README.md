@@ -1,4 +1,4 @@
-# 🦆 Duck Detector
+# 🦆 Duck Detector 3000
 
 Point your camera at anything yellow — rubber ducks, bananas, post-its, you name it!
 
