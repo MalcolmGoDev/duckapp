@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🦆 Duck Detector 3000 - Live Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a0a2e 0%, #16213e 50%, #0f0c29 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            color: white;
+            padding: 1rem;
+        }
+        
+        .back-link {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            color: rgba(255,255,255,0.6);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+        
+        .back-link:hover { color: white; }
+        
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #fff, #c4b5fd);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .instructions {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            color: #fbbf24;
+        }
+        
+        .status {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 1rem;
+        }
+        
+        .camera-container {
+            position: relative;
+            width: 90vw;
+            max-width: 500px;
+            aspect-ratio: 4/3;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            border: 4px solid rgba(255,255,255,0.2);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        
+        .camera-container.duck-found {
+            border-color: #fbbf24;
+            box-shadow: 0 0 50px rgba(251, 191, 36, 0.7);
+        }
+        
+        video, .detection-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        video {
+            transform: scaleX(-1);
+        }
+        
+        .detection-canvas {
+            transform: scaleX(-1);
+            pointer-events: none;
+        }
+        
+        .detected-duck {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            font-size: 1.5rem;
+            min-height: 3rem;
+        }
+        
+        .detected-duck .emoji {
+            font-size: 2.5rem;
+            animation: bounce 0.5s ease infinite alternate;
+        }
+        
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-10px); }
+        }
+        
+        .yellow-meter {
+            width: 90vw;
+            max-width: 500px;
+            height: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            margin-top: 1rem;
+            overflow: hidden;
+        }
+        
+        .yellow-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fbbf24, #f59e0b);
+            width: 0%;
+            transition: width 0.1s;
+            border-radius: 10px;
+        }
+        
+        .stop-btn {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .stop-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .floating-emoji {
+            position: fixed;
+            font-size: 2rem;
+            bottom: -50px;
+            z-index: 150;
+            animation: float-up 3s ease-out forwards;
+        }
+        
+        @keyframes float-up {
+            to {
+                transform: translateY(-120vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            top: -10px;
+            z-index: 150;
+            animation: fall linear forwards;
+        }
+        
+        @keyframes fall {
+            to {
+                transform: translateY(110vh) rotate(720deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-link">← Back to Home</a>
+    
+    <h1>🦆 Duck Detector 3000</h1>
+    <p class="instructions">👆 Hold up anything yellow!</p>
+    <div class="status" id="status">Starting camera...</div>
+    
+    <div class="camera-container" id="cameraContainer">
+        <video id="video" autoplay playsinline></video>
+        <canvas class="detection-canvas" id="canvas"></canvas>
+    </div>
+    
+    <div class="yellow-meter">
+        <div class="yellow-fill" id="yellowFill"></div>
+    </div>
+    
+    <div class="detected-duck" id="detectedDuck"></div>
+    
+    <button class="stop-btn" id="stopBtn" style="display: none;">⏹️ Stop Camera</button>
+    
+    <div class="overlay" id="overlay"></div>
+    
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const cameraContainer = document.getElementById('cameraContainer');
+        const detectedDuck = document.getElementById('detectedDuck');
+        const yellowFill = document.getElementById('yellowFill');
+        const overlay = document.getElementById('overlay');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        
+        let isRunning = false;
+        let duckFound = false;
+        let celebrationTimeout = null;
+        
+        const confettiColors = ['#fbbf24', '#f59e0b', '#8b5cf6', '#ec4899', '#3b82f6', '#10b981'];
+        const DUCK_THRESHOLD = 8;
+        
+        window.addEventListener('load', () => {
+            startCamera();
+        });
+        
+        stopBtn.addEventListener('click', () => {
+            stopCamera();
+        });
+        
+        async function startCamera() {
+            try {
+                status.textContent = 'Requesting camera access...';
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+                    audio: false 
+                });
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    video.play().then(() => {
+                        isRunning = true;
+                        stopBtn.style.display = 'block';
+                        status.textContent = 'Scanning for yellow...';
+                        detectYellow();
+                    });
+                };
+            } catch (err) {
+                status.textContent = 'Camera error: ' + err.message;
+                console.error(err);
+            }
+        }
+        
+        function stopCamera() {
+            isRunning = false;
+            const stream = video.srcObject;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            video.srcObject = null;
+            stopBtn.style.display = 'none';
+            status.textContent = 'Camera stopped. Refresh to restart.';
+            detectedDuck.innerHTML = '';
+            yellowFill.style.width = '0%';
+            cameraContainer.classList.remove('duck-found');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        
+        function detectYellow() {
+            if (!isRunning) return;
+            
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            let yellowPixels = 0;
+            const totalPixels = canvas.width * canvas.height;
+            const highlightData = ctx.createImageData(canvas.width, canvas.height);
+            
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                
+                if (isYellowColor(r, g, b)) {
+                    yellowPixels++;
+                    highlightData.data[i] = 251;
+                    highlightData.data[i + 1] = 191;
+                    highlightData.data[i + 2] = 36;
+                    highlightData.data[i + 3] = 150;
+                } else {
+                    highlightData.data[i + 3] = 0;
+                }
+            }
+            
+            const yellowPercent = (yellowPixels / totalPixels) * 100;
+            yellowFill.style.width = Math.min(yellowPercent * 5, 100) + '%';
+            ctx.putImageData(highlightData, 0, 0);
+            
+            if (yellowPercent >= DUCK_THRESHOLD) {
+                if (!duckFound) {
+                    duckFound = true;
+                    triggerCelebration();
+                }
+                cameraContainer.classList.add('duck-found');
+                detectedDuck.innerHTML = '<span class="emoji">🦆</span> DUCK DETECTED!';
+                status.textContent = `${yellowPercent.toFixed(1)}% yellow — QUACK!`;
+                
+                clearTimeout(celebrationTimeout);
+                celebrationTimeout = setTimeout(() => {
+                    duckFound = false;
+                }, 2000);
+            } else {
+                cameraContainer.classList.remove('duck-found');
+                detectedDuck.innerHTML = '';
+                status.textContent = `Scanning... ${yellowPercent.toFixed(1)}% yellow`;
+            }
+            
+            requestAnimationFrame(detectYellow);
+        }
+        
+        function isYellowColor(r, g, b) {
+            const { h, s, l } = rgbToHsl(r, g, b);
+            const hslYellow = h >= 25 && h <= 75 && s >= 25 && l >= 25 && l <= 90;
+            const rgbYellow = r > 150 && g > 120 && b < 150 && r > b * 1.3 && g > b * 1.2 && Math.abs(r - g) < 100;
+            const warmYellow = r > 180 && g > 140 && b < 120 && g > b;
+            return hslYellow || rgbYellow || warmYellow;
+        }
+        
+        function rgbToHsl(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+            if (max === min) { h = s = 0; } 
+            else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                    case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+                    case g: h = ((b - r) / d + 2) / 6; break;
+                    case b: h = ((r - g) / d + 4) / 6; break;
+                }
+            }
+            return { h: h * 360, s: s * 100, l: l * 100 };
+        }
+        
+        function triggerCelebration() {
+            playQuack();
+            for (let i = 0; i < 30; i++) setTimeout(() => spawnConfetti(), i * 20);
+            for (let i = 0; i < 8; i++) setTimeout(() => spawnFloatingEmoji(), i * 150);
+        }
+        
+        function spawnConfetti() {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            confetti.style.left = Math.random() * 100 + 'vw';
+            confetti.style.background = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+            confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+            confetti.style.width = (Math.random() * 10 + 5) + 'px';
+            confetti.style.height = confetti.style.width;
+            confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+            overlay.appendChild(confetti);
+            setTimeout(() => confetti.remove(), 4000);
+        }
+        
+        function spawnFloatingEmoji() {
+            const el = document.createElement('div');
+            el.className = 'floating-emoji';
+            el.textContent = '🦆';
+            el.style.left = Math.random() * 90 + 5 + 'vw';
+            el.style.fontSize = (Math.random() * 1.5 + 1.5) + 'rem';
+            overlay.appendChild(el);
+            setTimeout(() => el.remove(), 3000);
+        }
+        
+        function playQuack() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
+                osc.frequency.exponentialRampToValueAtTime(350, audioCtx.currentTime + 0.15);
+                osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.35);
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>
