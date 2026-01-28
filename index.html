@@ -30,6 +30,13 @@
             text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
         }
         
+        .instructions {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            color: #ffd700;
+        }
+        
         .status {
             font-size: 0.9rem;
             opacity: 0.7;
@@ -109,23 +116,23 @@
             border-radius: 10px;
         }
         
-        .start-btn {
-            background: linear-gradient(135deg, #ffd700, #ffb700);
-            color: #1a1a2e;
+        .stop-btn {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+            color: white;
             border: none;
-            padding: 1rem 2rem;
-            font-size: 1.2rem;
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
             font-weight: bold;
             border-radius: 50px;
             cursor: pointer;
             margin-top: 1rem;
-            box-shadow: 0 5px 20px rgba(255, 215, 0, 0.4);
+            box-shadow: 0 5px 20px rgba(255, 107, 107, 0.3);
             transition: transform 0.2s, box-shadow 0.2s;
         }
         
-        .start-btn:hover {
+        .stop-btn:hover {
             transform: scale(1.05);
-            box-shadow: 0 8px 30px rgba(255, 215, 0, 0.6);
+            box-shadow: 0 8px 30px rgba(255, 107, 107, 0.5);
         }
         
         .tip {
@@ -175,11 +182,17 @@
                 transform: translateY(110vh) rotate(720deg);
             }
         }
+        
+        .loading {
+            font-size: 1.2rem;
+            color: #ffd700;
+        }
     </style>
 </head>
 <body>
     <h1>🦆 Duck Detector</h1>
-    <div class="status" id="status">Ready to detect yellow things!</div>
+    <p class="instructions">👆 Hold up anything yellow!</p>
+    <div class="status" id="status">Starting camera...</div>
     
     <div class="camera-container" id="cameraContainer">
         <video id="video" autoplay playsinline></video>
@@ -192,10 +205,9 @@
     
     <div class="detected-duck" id="detectedDuck"></div>
     
-    <button class="start-btn" id="startBtn">📷 Start Camera</button>
+    <button class="stop-btn" id="stopBtn" style="display: none;">⏹️ Stop Camera</button>
     
-    <p class="tip">Point camera at something yellow — rubber ducks, bananas, anything! 🍌</p>
-    <p class="tip" style="margin-top: 0.5rem;"><a href="https://maven.com/p/e93f82/claude-code-101-kickstart-2026" target="_blank" style="color: #ffd700;">Built during Claude Code 101: Kickstart 2026</a></p>
+    <p class="tip"><a href="https://maven.com/p/e93f82/claude-code-101-kickstart-2026" target="_blank" style="color: #ffd700;">Built during Claude Code 101: Kickstart 2026</a></p>
     
     <div class="overlay" id="overlay"></div>
     
@@ -207,7 +219,7 @@
         const detectedDuck = document.getElementById('detectedDuck');
         const yellowFill = document.getElementById('yellowFill');
         const overlay = document.getElementById('overlay');
-        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
         const status = document.getElementById('status');
         
         let isRunning = false;
@@ -217,42 +229,41 @@
         // Colors for confetti
         const confettiColors = ['#ffd700', '#ffed4a', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7'];
         
-        // Threshold for "duck detected" (percentage of yellow pixels)
-        const DUCK_THRESHOLD = 15;
+        // Lower threshold for easier detection
+        const DUCK_THRESHOLD = 8;
         
-        startBtn.addEventListener('click', async () => {
-            if (isRunning) {
-                stopCamera();
-            } else {
-                await startCamera();
-            }
+        // Auto-start camera on page load
+        window.addEventListener('load', () => {
+            startCamera();
+        });
+        
+        stopBtn.addEventListener('click', () => {
+            stopCamera();
         });
         
         async function startCamera() {
             try {
+                status.textContent = 'Requesting camera access...';
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
                     audio: false 
                 });
                 video.srcObject = stream;
-                await video.play();
                 
                 // Wait for video to be ready
-                await new Promise(resolve => {
-                    video.onloadedmetadata = () => {
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        resolve();
-                    };
-                });
-                
-                isRunning = true;
-                startBtn.textContent = '⏹️ Stop Camera';
-                status.textContent = 'Scanning for yellow...';
-                
-                detectYellow();
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    video.play().then(() => {
+                        isRunning = true;
+                        stopBtn.style.display = 'block';
+                        status.textContent = 'Scanning for yellow...';
+                        detectYellow();
+                    });
+                };
             } catch (err) {
                 status.textContent = 'Camera error: ' + err.message;
+                console.error(err);
             }
         }
         
@@ -263,8 +274,8 @@
                 stream.getTracks().forEach(track => track.stop());
             }
             video.srcObject = null;
-            startBtn.textContent = '📷 Start Camera';
-            status.textContent = 'Ready to detect yellow things!';
+            stopBtn.style.display = 'none';
+            status.textContent = 'Camera stopped. Refresh to restart.';
             detectedDuck.innerHTML = '';
             yellowFill.style.width = '0%';
             cameraContainer.classList.remove('duck-found');
@@ -293,11 +304,8 @@
                 const g = data[i + 1];
                 const b = data[i + 2];
                 
-                // Convert to HSL to detect yellow better
-                const { h, s, l } = rgbToHsl(r, g, b);
-                
-                // Yellow is roughly 40-70 degrees in hue, with decent saturation and lightness
-                const isYellow = h >= 35 && h <= 65 && s >= 40 && l >= 30 && l <= 85;
+                // Multiple detection methods for better coverage
+                const isYellow = isYellowColor(r, g, b);
                 
                 if (isYellow) {
                     yellowPixels++;
@@ -315,7 +323,7 @@
             const yellowPercent = (yellowPixels / totalPixels) * 100;
             
             // Update yellow meter
-            yellowFill.style.width = Math.min(yellowPercent * 3, 100) + '%';
+            yellowFill.style.width = Math.min(yellowPercent * 5, 100) + '%';
             
             // Draw highlight overlay
             ctx.putImageData(highlightData, 0, 0);
@@ -342,6 +350,23 @@
             }
             
             requestAnimationFrame(detectYellow);
+        }
+        
+        function isYellowColor(r, g, b) {
+            // Method 1: HSL-based detection (wider range)
+            const { h, s, l } = rgbToHsl(r, g, b);
+            const hslYellow = h >= 25 && h <= 75 && s >= 25 && l >= 25 && l <= 90;
+            
+            // Method 2: RGB ratio detection
+            // Yellow has high R, high G, low B
+            const rgbYellow = r > 150 && g > 120 && b < 150 && 
+                              r > b * 1.3 && g > b * 1.2 &&
+                              Math.abs(r - g) < 100;
+            
+            // Method 3: Warm yellow/gold detection
+            const warmYellow = r > 180 && g > 140 && b < 120 && g > b;
+            
+            return hslYellow || rgbYellow || warmYellow;
         }
         
         function rgbToHsl(r, g, b) {
